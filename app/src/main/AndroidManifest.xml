@@ -28,7 +28,9 @@
         <activity
             android:name=".RecognitionActivity"
             android:screenOrientation="portrait"/>
-        <activity android:name=".ClassificationActivity" />
+        <activity
+            android:name=".ClassificationActivity"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

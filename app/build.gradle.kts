@@ -47,6 +47,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    implementation("org.opencv:opencv:4.9.0")
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     implementation(libs.camera.core)
     implementation(libs.camera.lifecycle)
