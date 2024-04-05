@@ -1,6 +1,6 @@
-downstairs
-jogging
-sitting
-standing
-upstairs
-walking
+Downstairs
+Jogging
+Sitting
+Standing
+Upstairs
+Walking

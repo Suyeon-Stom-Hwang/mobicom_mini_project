@@ -13,8 +13,10 @@ import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
+import android.util.Pair;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -30,15 +32,11 @@ import com.github.mikephil.charting.formatter.ValueFormatter;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
 
-import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 
@@ -56,6 +54,7 @@ class Acceleration {
 
 public class RecognitionActivity extends AppCompatActivity implements SensorEventListener {
     final String TAG = "RecognitionActivity";
+    final String MODEL_NAME = "activity_recognition_model.tflite";
     final long REQUIRED_DATA_FOR_INFERENCE = 90;
     final long INFERENCE_CYCLE_BY_DATA_POINT = 45;
     
@@ -63,9 +62,8 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
     private SensorManager sensorManager;
     private Sensor accelerometer;
     private long timestampAtStart;
-    private Interpreter activityRecognizer;
+    private ModelManager activityRecognizer;
     private ArrayDeque<Acceleration> accelData;
-    private ArrayList<String> activityLabels;
     private long dataPoint;
     LineChart lineChart;
 
@@ -75,13 +73,16 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_recognition);
 
+//        Toolbar setup
         Toolbar toolbar = findViewById(R.id.recognition_toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
+//        Sensor setup
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
+//        Chart setup by MPAndroidChart
         lineChart = findViewById(R.id.accel_chart);
         lineChart.getDescription().setEnabled(false);
         lineChart.getXAxis().setValueFormatter(new ValueFormatter() {
@@ -98,58 +99,7 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
         });
         lineChart.invalidate();
 
-        String modelName = "activity_recognition_model.tflite";
-        activityRecognizer = createInterpreterFromTfliteModel(modelName);
-
-        try {
-            InputStream is = getResources().openRawResource(R.raw.activity_labels);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            activityLabels = new ArrayList<>();
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                activityLabels.add(line.substring(0, 1).toUpperCase() + line.substring(1));
-            }
-        } catch (IOException e) {
-            Log.e(TAG, "onCreate: Fail to read all activity labels");
-        }
-    }
-
-    private Interpreter createInterpreterFromTfliteModel(String modelName) {
-        MappedByteBuffer modelData;
-        try {
-            modelData = loadTfliteModel(this, modelName);
-            Interpreter.Options options = new Interpreter.Options();
-            Interpreter interpreter = new Interpreter(modelData, options);
-            Log.i(TAG, "Success to load tflite model");
-            Log.i(TAG, "Input shape : " + interpreter.getInputTensorCount());
-            Tensor inputTensor = interpreter.getInputTensor(0);
-            Log.d(TAG, " name:" + inputTensor.name() + " shape:" +
-                    Arrays.toString(inputTensor.shape()) + " dtype:" + inputTensor.dataType());
-            Log.i(TAG, "Output shape : " + interpreter.getOutputTensorCount());
-            Tensor outputTensor = interpreter.getOutputTensor(0);
-            Log.d(TAG, " name:" + outputTensor.name() + " shape:" +
-                    Arrays.toString(outputTensor.shape()) + " dtype:" + outputTensor.dataType());
-
-            return interpreter;
-        } catch (Exception e) {
-            Log.e(TAG, "Fail to load tflite file");
-            Log.e(TAG, e.toString());
-        }
-        return null;
-    }
-
-    private MappedByteBuffer loadTfliteModel(Activity activity, String modelName) throws IOException {
-        AssetManager am = activity.getAssets();
-
-        AssetFileDescriptor fd = am.openFd(modelName);
-        FileInputStream inputStream = new FileInputStream(fd.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-
-        long startOffset = fd.getStartOffset();
-        long declaredLength = fd.getDeclaredLength();
-
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        activityRecognizer = new ModelManager(this, MODEL_NAME, R.raw.activity_labels);
     }
 
     private LineData createData() {
@@ -210,7 +160,7 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
     }
 
     private void recognizeActivity() {
-        int[] inputShape = activityRecognizer.getInputTensor(0).shape();
+        int[] inputShape = activityRecognizer.getInputShape();
 //         Input dimension = 1 * 90 * 3 * 1
         float[][][][] rawInput = new float [inputShape[0]][inputShape[1]][inputShape[2]][inputShape[3]];
         Iterator<Acceleration> iterator = accelData.iterator();
@@ -222,29 +172,17 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
             rawInput[0][i][2][0] = accel.z;
         }
 
-        int[] outputShape = activityRecognizer.getOutputTensor(0).shape();
-//        Output dimension = 1 * 6
-        float[][] rawOutput = new float [outputShape[0]][outputShape[1]];
-
-        activityRecognizer.run(rawInput, rawOutput);
-        float maxConfidence = 0;
-        int activityClass = 0;
-        for (int i = 0; i < 6; i++) {
-            Log.i(TAG, "recognizeActivity: " + activityLabels.get(i) + " / " + rawOutput[0][i]);
-            if (rawOutput[0][i] > maxConfidence) {
-                maxConfidence = rawOutput[0][i];
-                activityClass = i;
-            }
-        }
-
-        int finalActivityClass = activityClass;
-        float finalMaxConfidence = maxConfidence;
+        final Pair<String, Float> result = activityRecognizer.inferenceData(rawInput);
         runOnUiThread(() -> {
             TextView activityText = findViewById(R.id.activity_text);
-            activityText.setText(activityLabels.get(finalActivityClass));
+            activityText.setText(result.first);
 
             TextView confidenceText = findViewById(R.id.recognition_confidence_text);
-            confidenceText.setText(String.valueOf(finalMaxConfidence));
+            confidenceText.setText(String.format("%.5f", result.second));
+
+            ImageView activityImage = findViewById(R.id.activity_image);
+//            getResources().(R.raw.downstairs);
+//            activityImage.setImageURI(R.raw.downstairs);
         });
     }
 
