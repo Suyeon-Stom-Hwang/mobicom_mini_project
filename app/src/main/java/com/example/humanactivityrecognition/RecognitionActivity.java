@@ -1,10 +1,7 @@
 package com.example.humanactivityrecognition;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
-import android.content.res.AssetFileDescriptor;
-import android.content.res.AssetManager;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -29,15 +26,7 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 
-import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.Tensor;
-
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Iterator;
 
 class Acceleration {
@@ -57,7 +46,6 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
     final String MODEL_NAME = "activity_recognition_model.tflite";
     final long REQUIRED_DATA_FOR_INFERENCE = 90;
     final long INFERENCE_CYCLE_BY_DATA_POINT = 45;
-    
 
     private SensorManager sensorManager;
     private Sensor accelerometer;
@@ -65,7 +53,9 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
     private ModelManager activityRecognizer;
     private ArrayDeque<Acceleration> accelData;
     private long dataPoint;
-    LineChart lineChart;
+    private LineChart lineChart;
+    private TextView activityText;
+    private TextView confidenceText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,6 +67,10 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
         Toolbar toolbar = findViewById(R.id.recognition_toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+
+//        View setup
+        activityText = findViewById(R.id.activity_text);
+        confidenceText = findViewById(R.id.recognition_confidence_text);
 
 //        Sensor setup
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -154,7 +148,7 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
             lineData.notifyDataChanged();
 
             lineChart.notifyDataSetChanged();
-            lineChart.setVisibleXRangeMaximum(2000000000);
+            lineChart.setVisibleXRange(2000000000, 2000000000);
             lineChart.moveViewToX(timestampFromStart);
         });
     }
@@ -174,10 +168,7 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
 
         final Pair<String, Float> result = activityRecognizer.inferenceData(rawInput);
         runOnUiThread(() -> {
-            TextView activityText = findViewById(R.id.activity_text);
             activityText.setText(result.first);
-
-            TextView confidenceText = findViewById(R.id.recognition_confidence_text);
             confidenceText.setText(String.format("%.5f", result.second));
 
             ImageView activityImage = findViewById(R.id.activity_image);
@@ -197,7 +188,6 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
         timestampAtStart = SystemClock.elapsedRealtimeNanos();
         accelData = new ArrayDeque<>();
 
-        lineChart.clear();
         lineChart.setData(createData());
         lineChart.invalidate();
 
@@ -206,6 +196,14 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
 
     public void onEndButtonClicked(View view) {
         sensorManager.unregisterListener(this);
+
+        lineChart.resetZoom();
+        lineChart.resetViewPortOffsets();
+        lineChart.clear();
+        lineChart.invalidate();
+
+        activityText.setText(R.string.default_result);
+        confidenceText.setText("0");
     }
 
     @Override

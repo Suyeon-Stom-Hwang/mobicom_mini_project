@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:layout_margin="1dp"
                 android:layout_weight="1"
-                android:text="Capture &amp; Inference"
+                android:text="@string/description"
                 android:textAlignment="center"
                 android:textSize="16sp" />
 
@@ -74,7 +74,7 @@
             android:id="@+id/object_class_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="No Result Available"
+            android:text="@string/default_result"
             android:textAlignment="center"
             android:textColor="#2196F3"
             android:textSize="34sp"
