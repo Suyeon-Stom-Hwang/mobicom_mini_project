@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">HumanActivityRecognition</string>
+    <string name="default_result">No Result available</string>
+    <string name="description">Capture &amp; Inference</string>
 </resources>
