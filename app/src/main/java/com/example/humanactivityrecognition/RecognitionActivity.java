@@ -27,6 +27,7 @@ import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 
 import java.util.ArrayDeque;
+import java.util.HashMap;
 import java.util.Iterator;
 
 class Acceleration {
@@ -56,6 +57,8 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
     private LineChart lineChart;
     private TextView activityText;
     private TextView confidenceText;
+    private ImageView activityImage;
+    private HashMap<String, Integer> activityImageMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +74,16 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
 //        View setup
         activityText = findViewById(R.id.activity_text);
         confidenceText = findViewById(R.id.recognition_confidence_text);
+        activityImage = findViewById(R.id.activity_image);
+
+//        Resource setup
+        activityImageMap = new HashMap<>();
+        activityImageMap.put("Jogging", R.drawable.jogging);
+        activityImageMap.put("Upstairs", R.drawable.upstairs);
+        activityImageMap.put("Downstairs", R.drawable.downstairs);
+        activityImageMap.put("Sitting", R.drawable.sitting);
+        activityImageMap.put("Walking", R.drawable.walking);
+        activityImageMap.put("Standing", R.drawable.standing);
 
 //        Sensor setup
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -171,9 +184,10 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
             activityText.setText(result.first);
             confidenceText.setText(String.format("%.5f", result.second));
 
-            ImageView activityImage = findViewById(R.id.activity_image);
-//            getResources().(R.raw.downstairs);
-//            activityImage.setImageURI(R.raw.downstairs);
+            Integer resourceId = activityImageMap.get(result.first);
+            if (resourceId != null) {
+                activityImage.setImageResource(resourceId);
+            }
         });
     }
 
@@ -204,6 +218,7 @@ public class RecognitionActivity extends AppCompatActivity implements SensorEven
 
         activityText.setText(R.string.default_result);
         confidenceText.setText("0");
+        activityImage.setImageResource(R.drawable.ic_launcher_foreground);
     }
 
     @Override

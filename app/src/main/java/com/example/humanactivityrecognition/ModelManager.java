@@ -90,6 +90,10 @@ public class ModelManager {
         return interpreter.getInputTensor(0).shape();
     }
 
+    public ArrayList<String> getLabels() {
+        return labels;
+    }
+
     public Pair<String, Float> inferenceData(float[][][][] rawInput) {
         int[] outputShape = interpreter.getOutputTensor(0).shape();
         float[][] rawOutput = new float [outputShape[0]][outputShape[1]];
