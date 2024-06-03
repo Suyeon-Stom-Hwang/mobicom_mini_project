@@ -39,26 +39,16 @@
         app:layout_constraintTop_toBottomOf="@+id/title2" />
 
     <Button
-        android:id="@+id/main_button1"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_marginTop="32dp"
-        android:onClick="onStartActivityRecognition"
-        android:text="ACTIVITY RECOGNITION"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView3" />
-
-    <Button
         android:id="@+id/main_button2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:text="OBJECT CLASSIFICATION"
+        android:layout_marginTop="32dp"
         android:onClick="onStartObjectClassification"
+        android:text="OBJECT CLASSIFICATION"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.502"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/main_button1" />
+        app:layout_constraintTop_toBottomOf="@+id/textView3" />
 
     <TextView
         android:id="@+id/textView3"

@@ -1,15 +1,15 @@
 package com.example.humanactivityrecognition;
 
+import static org.opencv.imgproc.Imgproc.threshold;
+
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.Pair;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -26,23 +26,30 @@ import androidx.core.content.ContextCompat;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Point;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public class ClassificationActivity extends AppCompatActivity {
     final String TAG = "ClassificationActivity";
-    final String MODEL_NAME = "classification_model.tflite";
     String[] PERMISSIONS = new String[]{android.Manifest.permission.CAMERA};
 
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private ProcessCameraProvider cameraProvider;
     private PreviewView previewView;
     private ImageView capturedImage;
-    private ModelManager objectClassifier;
+    private ModelManager textDetection;
+    private ModelManager textRecognition;
     private Bitmap frameBuffer;
 
     @Override
@@ -71,7 +78,8 @@ public class ClassificationActivity extends AppCompatActivity {
         }, ContextCompat.getMainExecutor(this));
         ActivityCompat.requestPermissions(this, PERMISSIONS, 1);
 
-        objectClassifier = new ModelManager(this, MODEL_NAME, R.raw.imagenet_labels);
+        textDetection = new ModelManager(this, "craft_float_640.tflite");
+        textRecognition = new ModelManager(this, "crnn_dr.tflite");
     }
 
     @Override
@@ -127,42 +135,111 @@ public class ClassificationActivity extends AppCompatActivity {
     }
 
     public void onCaptureButtonClicked(View view) {
-        Matrix matrix = new Matrix();
-        matrix.postRotate(90);
-        Bitmap preprocessedBitmap = cropAndRotateBitmap(frameBuffer, 90, 80, 0,
-                frameBuffer.getHeight(), frameBuffer.getHeight());
+        Log.i(TAG, "onCaptureButtonClicked: " + frameBuffer.getWidth() + "," + frameBuffer.getHeight());
+        Bitmap preprocessedBitmap = cropAndRotateBitmap(frameBuffer, 0, 0, 0,
+                frameBuffer.getWidth(), frameBuffer.getHeight());
         capturedImage.setImageBitmap(preprocessedBitmap);
+        Log.i(TAG, "onCaptureButtonClicked: " + preprocessedBitmap.getWidth() + "," + preprocessedBitmap.getHeight());
 
-        int[] inputShape = objectClassifier.getInputShape();
-        Mat normalizeMat = resizeAndNormalizeMat(preprocessedBitmap, inputShape[1], inputShape[2]);
+        int[] inputShape = textDetection.getInputShape();
+        Mat normalizeMat = resizeAndNormalizeMat(preprocessedBitmap, inputShape[2], inputShape[3]);
+        Log.i(TAG, "onCaptureButtonClicked: " + Arrays.toString(inputShape));
+        Log.i(TAG, "onCaptureButtonClicked: " + normalizeMat);
 
-//        Input dimension = 1 * 224 * 224 * 3
+//        Input dimension = 1 * 3 * 640 * 416
         float[][][][] rawInput = new float[inputShape[0]][inputShape[1]][inputShape[2]][inputShape[3]];
 
-        for (int i = 0; i < inputShape[1]; i++) {
-            for (int j = 0; j < inputShape[2]; j++) {
-                double[] current = normalizeMat.get(i, j);
-                rawInput[0][i][j][0] = (float) current[0];
-                rawInput[0][i][j][1] = (float) current[1];
-                rawInput[0][i][j][2] = (float) current[2];
+        for (int i = 0; i < inputShape[2]; i++) {
+            for (int j = 0; j < inputShape[3]; j++) {
+                double[] current = normalizeMat.get(j, i);
+                rawInput[0][0][i][j] = (float) current[0];
+                rawInput[0][1][i][j] = (float) current[1];
+                rawInput[0][2][i][j] = (float) current[2];
             }
         }
 
-        final Pair<String, Float> result = objectClassifier.inferenceData(rawInput);
-        Log.i(TAG, "onCaptureButtonClicked: " + result.first + " / " + result.second);
+//        0 -> text score, 1 -> link score
+        Mat result = textDetection.inferenceData(rawInput);
+        Log.i(TAG, "onCaptureButtonClicked: " + result);
 
         runOnUiThread(() -> {
-            TextView objectClassText = findViewById(R.id.object_class_text);
-            objectClassText.setText(result.first);
-
-            TextView confidenceText = findViewById(R.id.classification_confidence_text);
-            confidenceText.setText(String.format("%.5f", result.second));
         });
+    }
+
+    public static List<MatOfPoint> getDetBoxes(Mat textMap, Mat linkMap, double textThreshold, double linkThreshold, double lowText) {
+        // Prepare data
+        Mat linkmapCopy = linkMap.clone();
+        Mat textmapCopy = textMap.clone();
+        int imgH = textMap.rows();
+        int imgW = textMap.cols();
+
+        // Labeling method
+        Mat textScore = new Mat();
+        Core.compare(textMap, new Scalar(lowText), textScore, Core.CMP_GT);
+        Mat linkScore = new Mat();
+        Core.compare(linkMap, new Scalar(linkThreshold), linkScore, Core.CMP_GT);
+        Mat textScoreComb = new Mat();
+        Core.add(textScore, linkScore, textScoreComb);
+        Core.minMaxLoc(textScoreComb);
+
+        // Connected components
+        Mat labels = new Mat();
+        Mat stats = new Mat();
+        Mat centroids = new Mat();
+        int connectivity = 4;
+        int nLabels = Imgproc.connectedComponentsWithStats(textScoreComb, labels, stats, centroids, connectivity);
+
+        List<MatOfPoint> det = new ArrayList<>();
+        for (int k = 1; k < nLabels; k++) {
+            // Size filtering
+            double size = stats.get(k, Imgproc.CC_STAT_AREA)[0];
+            if (size < 10) continue;
+
+            // Thresholding
+            double maxTextScore = Core.minMaxLoc(textMap.submat(labels).reshape(1)).maxVal;
+            if (maxTextScore < textThreshold) continue;
+
+            // Make segmentation map
+            Mat segmap = new Mat(textMap.size(), textMap.type(), Scalar.all(0));
+            segmap.setTo(new Scalar(255), labels == k);
+            Core.bitwise_and(segmap, linkScore, segmap);
+            Core.dilate(segmap, segmap, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3)));
+
+            // Make box
+            List<Point> npContours = new ArrayList<>();
+            Core.findNonZero(segmap, npContours);
+            MatOfPoint contour = new MatOfPoint();
+            contour.fromList(npContours);
+            MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
+            RotatedRect rectangle = Imgproc.minAreaRect(contour2f);
+            Point[] boxPoints = new Point[4];
+            rectangle.points(boxPoints);
+            MatOfPoint box = new MatOfPoint(boxPoints);
+
+            // Align diamond shape
+            double w = Core.norm(box.get(0, 0), box.get(1, 0));
+            double h = Core.norm(box.get(1, 0), box.get(2, 0));
+            double boxRatio = Math.max(w, h) / (Math.min(w, h) + 1e-5);
+            if (Math.abs(1 - boxRatio) <= 0.1) {
+                double l = Core.min(contour2f.get(0, 0)).x;
+                double r = Core.max(contour2f.get(0, 0)).x;
+                double t = Core.min(contour2f.get(0, 1)).y;
+                double b = Core.max(contour2f.get(0, 1)).y;
+                box = new MatOfPoint(new Point(l, t), new Point(r, t), new Point(r, b), new Point(l, b));
+            }
+
+            // Make clockwise order
+            int startIdx = (int) Core.minMaxLoc(box.reshape(1)).minLoc.x;
+            Core.rotate(box, box, 4 - startIdx);
+            det.add(box);
+        }
+
+        return det;
     }
 
     private Bitmap cropAndRotateBitmap(Bitmap frameBuffer, int degree, int x, int y, int width, int height) {
         Matrix matrix = new Matrix();
-        matrix.postRotate(degree);
+//        matrix.postRotate(degree);
         return Bitmap.createBitmap(
                 frameBuffer,
                 x,
@@ -170,7 +247,7 @@ public class ClassificationActivity extends AppCompatActivity {
                 width,
                 height,
                 matrix,
-                true);
+                false);
     }
 
     private Mat resizeAndNormalizeMat(Bitmap frameBuffer, int width, int height) {

@@ -27,11 +27,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public void onStartActivityRecognition(View view) {
-        Intent intent = new Intent(this, RecognitionActivity.class);
-        startActivity(intent);
-    }
-
     public void onStartObjectClassification(View view) {
         Intent intent = new Intent(this, ClassificationActivity.class);
         startActivity(intent);
