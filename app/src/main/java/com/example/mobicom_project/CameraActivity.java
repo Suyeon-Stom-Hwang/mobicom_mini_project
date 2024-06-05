@@ -2,8 +2,12 @@ package com.example.mobicom_project;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
@@ -12,6 +16,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
@@ -25,6 +30,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import com.google.android.gms.tasks.Task;
+import com.google.mlkit.vision.text.Text;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -49,11 +57,13 @@ public class CameraActivity extends AppCompatActivity {
     private String cameraId;
     private Size imageDimension;
     private ScaleGestureDetector scaleGestureDetector;
+    private MLKitTextRecognition textRecognizer;
     private float currentZoomLevel = 1f;
     private float maximumZoomLevel;
     private boolean isZooming = false;
     private long lastZoomTime = 0;
     private static final long ZOOM_INTERVAL = 100;
+    private final String TAG = "CameraActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +86,7 @@ public class CameraActivity extends AppCompatActivity {
             }
         });
 
+        textRecognizer = new MLKitTextRecognition();
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 200);
@@ -255,9 +266,20 @@ public class CameraActivity extends AppCompatActivity {
                     Image image = null;
                     try {
                         image = reader.acquireLatestImage();
+                        Task<Text> recognitionTask = textRecognizer.recognizeTextFromImage(image, rotation);
+                        recognitionTask
+                                .addOnSuccessListener(visionText -> {
+                                    Log.i(TAG, "onSuccess: " +  visionText.getText());
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.i(TAG, "onFailure: " +  e);
+                                })
+                                .addOnCompleteListener(task -> {
+                                    Log.i(TAG, "onComplete: " +  task);
+                                });
                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.capacity()];
-                        buffer.get(bytes);
+//                        buffer.get(bytes);
                         save(bytes);
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
@@ -329,4 +351,5 @@ public class CameraActivity extends AppCompatActivity {
             }
         }
     }
+
 }
