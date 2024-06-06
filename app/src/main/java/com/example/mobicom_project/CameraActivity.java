@@ -3,6 +3,9 @@ package com.example.mobicom_project;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.*;
@@ -19,6 +22,7 @@ import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -87,7 +91,8 @@ public class CameraActivity extends AppCompatActivity {
             }
         });
 
-        textRecognizer = new MLKitTextRecognition();
+        ImageView canvasView = findViewById(R.id.canvasView);
+        textRecognizer = new MLKitTextRecognition(canvasView);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 200);
@@ -267,8 +272,8 @@ public class CameraActivity extends AppCompatActivity {
                     Image image = null;
                     try {
                         image = reader.acquireLatestImage();
-                        Task<Text> recognitionTask = textRecognizer.recognizeTextFromImage(image, rotation);
-                        recognitionTask
+                        Log.i(TAG, "onImageAvailable: " + image.getWidth() + ", " + image.getHeight());
+                        Task<Text> recognitionTask = textRecognizer.recognizeTextFromImage(image, ORIENTATIONS.get(rotation))
                                 .addOnSuccessListener(visionText -> {
                                     Log.i(TAG, "onSuccess: " +  visionText.getText());
                                     runOnUiThread(() -> textView3.setText(visionText.getText()));
@@ -313,7 +318,7 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-//                    createCameraPreview();
+//                  createCameraPreview();
                 }
             };
 
@@ -353,5 +358,4 @@ public class CameraActivity extends AppCompatActivity {
             }
         }
     }
-
 }

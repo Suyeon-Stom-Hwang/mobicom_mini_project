@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">mobicom_project</string>
+    <string name="canvasViewDescription">This is for drawing bounding box</string>
+    <string name="captureButtonText">拍照</string>
+    <string name="previewViewDescription">This is for temporary preview</string>
 </resources>
