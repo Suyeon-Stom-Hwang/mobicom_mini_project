@@ -2,20 +2,15 @@ package com.example.mobicom_project;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.ImageFormat;
-import android.graphics.Matrix;
-import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.*;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -23,8 +18,8 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.TextureView;
-import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -49,6 +44,8 @@ public class CameraActivity extends AppCompatActivity {
 
     private TextureView textureView;
     private Button captureButton;
+    private TextView textView3;
+    private  Button recaptureButton;
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -72,9 +69,13 @@ public class CameraActivity extends AppCompatActivity {
 
         textureView = findViewById(R.id.textureView);
         captureButton = findViewById(R.id.captureButton);
+        textView3 = findViewById(R.id.textView3);
+        textView3.setMovementMethod(new ScrollingMovementMethod());
+        recaptureButton = findViewById(R.id.recaptureButton);
 
         textureView.setSurfaceTextureListener(textureListener);
         captureButton.setOnClickListener(v -> takePicture());
+        recaptureButton.setOnClickListener(v -> createCameraPreview());
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
@@ -270,6 +271,7 @@ public class CameraActivity extends AppCompatActivity {
                         recognitionTask
                                 .addOnSuccessListener(visionText -> {
                                     Log.i(TAG, "onSuccess: " +  visionText.getText());
+                                    runOnUiThread(() -> textView3.setText(visionText.getText()));
                                 })
                                 .addOnFailureListener(e -> {
                                     Log.i(TAG, "onFailure: " +  e);
@@ -311,7 +313,7 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-                    createCameraPreview();
+//                    createCameraPreview();
                 }
             };
 
