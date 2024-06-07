@@ -20,22 +20,11 @@
         android:layout_width="120dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
-        android:text="capture"
+        android:text="@string/capture"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintHorizontal_bias="0.281"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toLeftOf="@id/recaptureButton" />
-
-    <Button
-        android:id="@+id/recaptureButton"
-        android:layout_width="120dp"
-        android:layout_marginBottom="16dp"
-        android:layout_height="wrap_content"
-        android:text="recapture"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toRightOf="@id/captureButton"
-        app:layout_constraintRight_toRightOf="parent"
-        tools:layout_editor_absoluteY="791dp" />
+        app:layout_constraintStart_toStartOf="parent" />
 
     <TextView
         android:id="@+id/textView3"

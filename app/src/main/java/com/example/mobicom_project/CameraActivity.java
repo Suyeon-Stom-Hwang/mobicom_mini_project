@@ -43,7 +43,6 @@ public class CameraActivity extends AppCompatActivity {
     private TextureView textureView;
     private Button captureButton;
     private TextView textView3;
-    private  Button recaptureButton;
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -57,6 +56,7 @@ public class CameraActivity extends AppCompatActivity {
     private float maximumZoomLevel;
     private boolean isZooming = false;
     private long lastZoomTime = 0;
+    private boolean isInCaptured = false;
     private static final long ZOOM_INTERVAL = 100;
     private final String TAG = "CameraActivity";
 
@@ -69,13 +69,20 @@ public class CameraActivity extends AppCompatActivity {
         captureButton = findViewById(R.id.captureButton);
         textView3 = findViewById(R.id.textView3);
         textView3.setMovementMethod(new ScrollingMovementMethod());
-        recaptureButton = findViewById(R.id.recaptureButton);
 
         textureView.setSurfaceTextureListener(textureListener);
-        captureButton.setOnClickListener(v -> takePicture());
-        recaptureButton.setOnClickListener(v -> {
-            textRecognizer.clearBoundingBox();
-            createCameraPreview();
+        isInCaptured = false;
+        captureButton.setOnClickListener(v -> {
+            if (isInCaptured) {
+                textRecognizer.clearBoundingBox();
+                createCameraPreview();
+                captureButton.setText(R.string.capture);
+                isInCaptured = false;
+            } else {
+                takePicture();
+                captureButton.setText(R.string.recapture);
+                isInCaptured = true;
+            }
         });
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
