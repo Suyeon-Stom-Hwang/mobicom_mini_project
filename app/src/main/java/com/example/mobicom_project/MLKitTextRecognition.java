@@ -48,11 +48,12 @@ public class MLKitTextRecognition extends AppCompatActivity {
     }
 
     public Task<Text> recognizeTextFromImage(Image snapshot, int rotation) {
+        Log.i(TAG, "recognizeTextFromImage: rotation - " + rotation);
         InputImage image = InputImage.fromMediaImage(snapshot, rotation);
         return recognizerKor.process(image)
                 .addOnSuccessListener(visionText -> {
                     Log.i(TAG, "onSuccess: " +  visionText.getText());
-                    drawBoundingBox(image.getWidth(), image.getHeight(), visionText);
+                    runOnUiThread(() -> drawBoundingBox(image.getWidth(), image.getHeight(), visionText));
                 })
                 .addOnFailureListener(e -> {
                     Log.i(TAG, "onFailure: " +  e);
@@ -63,6 +64,7 @@ public class MLKitTextRecognition extends AppCompatActivity {
     }
 
     private void drawBoundingBox(int imageW, int imageH, Text output) {
+        Log.i(TAG, "drawBoundingBox: imageW - " + imageW + ", imageH - " + imageH);
         canvasBitmap.eraseColor(Color.TRANSPARENT);
 
         Paint boxPaint = new Paint();
@@ -71,14 +73,13 @@ public class MLKitTextRecognition extends AppCompatActivity {
         boxPaint.setStrokeWidth(10);
         for (Text.TextBlock block : output.getTextBlocks()) {
             Rect boundingBox = block.getBoundingBox();
-
-            Log.d(TAG, "drawBoundingBox: " + boundingBox);
-
             if (boundingBox != null) {
+                Log.d(TAG, "drawBoundingBox: " + boundingBox);
                 Rect fixedRect = rearrangePosition(imageW, imageH, boundingBox);
                 boundingBoxCanvas.drawRect(fixedRect, boxPaint);
             }
         }
+        canvasView.invalidate();
     }
 
     private Rect rearrangePosition(int imageW, int imageH, Rect boundingBox) {
@@ -90,5 +91,10 @@ public class MLKitTextRecognition extends AppCompatActivity {
                 (int) (boundingBox.top * ratioH),
                 (int) (boundingBox.right * ratioW),
                 (int) (boundingBox.bottom * ratioH));
+    }
+
+    public void clearBoundingBox() {
+        Log.i(TAG, "clearBoundingBox: ");
+        canvasBitmap.eraseColor(Color.TRANSPARENT);
     }
 }

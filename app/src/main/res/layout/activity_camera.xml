@@ -59,12 +59,12 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginBottom="150dp"
-        app:srcCompat="@drawable/ic_launcher_foreground"
         android:contentDescription="@string/canvasViewDescription"
         app:layout_constraintBottom_toTopOf="@id/captureButton"
-        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent" />
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@drawable/ic_launcher_foreground" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 <!--</androidx.constraintlayout.widget.ConstraintLayout>-->

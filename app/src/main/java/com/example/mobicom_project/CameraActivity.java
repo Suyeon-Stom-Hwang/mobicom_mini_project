@@ -3,9 +3,6 @@ package com.example.mobicom_project;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
-import android.graphics.Matrix;
-import android.graphics.Paint;
-import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.*;
@@ -29,9 +26,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
-import com.google.android.gms.tasks.Task;
-import com.google.mlkit.vision.text.Text;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -79,7 +73,10 @@ public class CameraActivity extends AppCompatActivity {
 
         textureView.setSurfaceTextureListener(textureListener);
         captureButton.setOnClickListener(v -> takePicture());
-        recaptureButton.setOnClickListener(v -> createCameraPreview());
+        recaptureButton.setOnClickListener(v -> {
+            textRecognizer.clearBoundingBox();
+            createCameraPreview();
+        });
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
@@ -272,8 +269,7 @@ public class CameraActivity extends AppCompatActivity {
                     Image image = null;
                     try {
                         image = reader.acquireLatestImage();
-                        Log.i(TAG, "onImageAvailable: " + image.getWidth() + ", " + image.getHeight());
-                        Task<Text> recognitionTask = textRecognizer.recognizeTextFromImage(image, ORIENTATIONS.get(rotation))
+                        textRecognizer.recognizeTextFromImage(image, ORIENTATIONS.get(rotation))
                                 .addOnSuccessListener(visionText -> {
                                     Log.i(TAG, "onSuccess: " +  visionText.getText());
                                     runOnUiThread(() -> textView3.setText(visionText.getText()));
@@ -286,7 +282,6 @@ public class CameraActivity extends AppCompatActivity {
                                 });
                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.capacity()];
-//                        buffer.get(bytes);
                         save(bytes);
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
@@ -318,7 +313,6 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-//                  createCameraPreview();
                 }
             };
 
