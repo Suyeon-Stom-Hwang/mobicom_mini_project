@@ -56,6 +56,7 @@ public class CameraActivity extends AppCompatActivity {
     private float maximumZoomLevel;
     private boolean isZooming = false;
     private long lastZoomTime = 0;
+    private Rect currentZoomRect;
     private boolean isInCaptured = false;
     private static final long ZOOM_INTERVAL = 100;
     private final String TAG = "CameraActivity";
@@ -162,18 +163,15 @@ public class CameraActivity extends AppCompatActivity {
         CameraCharacteristics characteristics;
         try {
             characteristics = cameraManager.getCameraCharacteristics(cameraDevice.getId());
-            float maxZoom = (characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)) * 10;
+//            float maxZoom = (characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM));
 
             Rect m = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
-            int minW = (int) (m.width() / maxZoom);
-            int minH = (int) (m.height() / maxZoom);
-            int difW = m.width() - minW;
-            int difH = m.height() - minH;
-            int cropW = difW / 100 * (int) currentZoomLevel;
-            int cropH = difH / 100 * (int) currentZoomLevel;
-            cropW -= cropW & 3;
-            cropH -= cropH & 3;
-            Rect zoom = new Rect(cropW, cropH, m.width() - cropW, m.height() - cropH);
+            int newWidth = (int) (m.width() / currentZoomLevel);
+            int newHeight = (int) (m.height() / currentZoomLevel);
+            int leftOffset = (m.width() - newWidth) / 2;
+            int topOffset = (m.height() - newHeight) / 2;
+            Rect zoom = new Rect(leftOffset, topOffset, leftOffset + newWidth, topOffset + newHeight);
+            currentZoomRect = zoom;
             captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoom);
             cameraCaptureSessions.setRepeatingRequest(captureRequestBuilder.build(),
             new CameraCaptureSession.CaptureCallback() {
