@@ -48,7 +48,6 @@ public class CameraActivity extends AppCompatActivity {
     private CameraDevice cameraDevice;
     private CaptureRequest.Builder captureRequestBuilder;
     private CameraCaptureSession cameraCaptureSessions;
-    private String cameraId;
     private Size imageDimension;
     private ScaleGestureDetector scaleGestureDetector;
     private MLKitTextRecognition textRecognizer;
@@ -136,7 +135,7 @@ public class CameraActivity extends AppCompatActivity {
     private void openCamera() {
         cameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
-            cameraId = cameraManager.getCameraIdList()[0];
+            String cameraId = cameraManager.getCameraIdList()[0];
             CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             imageDimension = map.getOutputSizes(SurfaceTexture.class)[0];
@@ -162,9 +161,8 @@ public class CameraActivity extends AppCompatActivity {
 
         CameraCharacteristics characteristics;
         try {
+            Log.i(TAG, "applyZoom: currentZoomLevel" + currentZoomLevel);
             characteristics = cameraManager.getCameraCharacteristics(cameraDevice.getId());
-//            float maxZoom = (characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM));
-
             Rect m = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
             int newWidth = (int) (m.width() / currentZoomLevel);
             int newHeight = (int) (m.height() / currentZoomLevel);
@@ -174,13 +172,13 @@ public class CameraActivity extends AppCompatActivity {
             currentZoomRect = zoom;
             captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoom);
             cameraCaptureSessions.setRepeatingRequest(captureRequestBuilder.build(),
-            new CameraCaptureSession.CaptureCallback() {
-                @Override
-                public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-                    super.onCaptureCompleted(session, request, result);
-                    isZooming = false;
-                }
-            }, null);
+                    new CameraCaptureSession.CaptureCallback() {
+                        @Override
+                        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+                            super.onCaptureCompleted(session, request, result);
+                            isZooming = false;
+                        }
+                    }, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
             isZooming = false;
@@ -214,6 +212,8 @@ public class CameraActivity extends AppCompatActivity {
             Surface surface = new Surface(texture);
             captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             captureRequestBuilder.addTarget(surface);
+            currentZoomRect = cameraManager.getCameraCharacteristics(cameraDevice.getId())
+                    .get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
 
             cameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
@@ -262,6 +262,8 @@ public class CameraActivity extends AppCompatActivity {
             final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureBuilder.addTarget(reader.getSurface());
             captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+            captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, currentZoomRect);
+            Log.d(TAG, "takePicture: " + currentZoomRect);
 
             // Orientation
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
