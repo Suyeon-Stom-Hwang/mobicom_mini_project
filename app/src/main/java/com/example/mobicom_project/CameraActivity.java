@@ -19,15 +19,13 @@ import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
-import com.google.android.gms.tasks.Task;
-import com.google.mlkit.vision.text.Text;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -45,7 +43,6 @@ public class CameraActivity extends AppCompatActivity {
     private TextureView textureView;
     private Button captureButton;
     private TextView textView3;
-    private  Button recaptureButton;
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -59,6 +56,7 @@ public class CameraActivity extends AppCompatActivity {
     private float maximumZoomLevel;
     private boolean isZooming = false;
     private long lastZoomTime = 0;
+    private boolean isInCaptured = false;
     private static final long ZOOM_INTERVAL = 100;
     private final String TAG = "CameraActivity";
 
@@ -71,11 +69,21 @@ public class CameraActivity extends AppCompatActivity {
         captureButton = findViewById(R.id.captureButton);
         textView3 = findViewById(R.id.textView3);
         textView3.setMovementMethod(new ScrollingMovementMethod());
-        recaptureButton = findViewById(R.id.recaptureButton);
 
         textureView.setSurfaceTextureListener(textureListener);
-        captureButton.setOnClickListener(v -> takePicture());
-        recaptureButton.setOnClickListener(v -> createCameraPreview());
+        isInCaptured = false;
+        captureButton.setOnClickListener(v -> {
+            if (isInCaptured) {
+                textRecognizer.clearBoundingBox();
+                createCameraPreview();
+                captureButton.setText(R.string.capture);
+                isInCaptured = false;
+            } else {
+                takePicture();
+                captureButton.setText(R.string.recapture);
+                isInCaptured = true;
+            }
+        });
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
@@ -87,7 +95,8 @@ public class CameraActivity extends AppCompatActivity {
             }
         });
 
-        textRecognizer = new MLKitTextRecognition();
+        ImageView canvasView = findViewById(R.id.canvasView);
+        textRecognizer = new MLKitTextRecognition(canvasView);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 200);
@@ -267,8 +276,7 @@ public class CameraActivity extends AppCompatActivity {
                     Image image = null;
                     try {
                         image = reader.acquireLatestImage();
-                        Task<Text> recognitionTask = textRecognizer.recognizeTextFromImage(image, rotation);
-                        recognitionTask
+                        textRecognizer.recognizeTextFromImage(image, ORIENTATIONS.get(rotation))
                                 .addOnSuccessListener(visionText -> {
                                     Log.i(TAG, "onSuccess: " +  visionText.getText());
                                     runOnUiThread(() -> textView3.setText(visionText.getText()));
@@ -281,7 +289,6 @@ public class CameraActivity extends AppCompatActivity {
                                 });
                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.capacity()];
-//                        buffer.get(bytes);
                         save(bytes);
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
@@ -313,7 +320,6 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-//                    createCameraPreview();
                 }
             };
 
@@ -353,5 +359,4 @@ public class CameraActivity extends AppCompatActivity {
             }
         }
     }
-
 }
