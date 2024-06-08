@@ -28,14 +28,14 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public class CameraActivity extends AppCompatActivity {
@@ -87,7 +87,7 @@ public class CameraActivity extends AppCompatActivity {
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
-            public boolean onScale(ScaleGestureDetector detector) {
+            public boolean onScale(@NonNull ScaleGestureDetector detector) {
                 float scale = detector.getScaleFactor();
                 currentZoomLevel = Math.max(1f, Math.min(currentZoomLevel * scale, maximumZoomLevel));
                 applyZoom();
@@ -96,7 +96,8 @@ public class CameraActivity extends AppCompatActivity {
         });
 
         ImageView canvasView = findViewById(R.id.canvasView);
-        textRecognizer = new MLKitTextRecognition(canvasView);
+        ImageView tempView = findViewById(R.id.capturedView);
+        textRecognizer = new MLKitTextRecognition(canvasView, tempView);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 200);
@@ -113,22 +114,22 @@ public class CameraActivity extends AppCompatActivity {
 
     private final TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
-        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+        public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
             openCamera();
         }
 
         @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+        public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
             // Transform you image captured size according to the surface width and height
         }
 
         @Override
-        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+        public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
             return false;
         }
 
         @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+        public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
         }
     };
 
@@ -153,7 +154,7 @@ public class CameraActivity extends AppCompatActivity {
 
     private void applyZoom() {
         // relieve stalling
-        if (isZooming) return;
+        if (isZooming || isInCaptured) return;
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastZoomTime < ZOOM_INTERVAL) return;
         isZooming = true;
@@ -161,16 +162,18 @@ public class CameraActivity extends AppCompatActivity {
 
         CameraCharacteristics characteristics;
         try {
-            Log.i(TAG, "applyZoom: currentZoomLevel" + currentZoomLevel);
             characteristics = cameraManager.getCameraCharacteristics(cameraDevice.getId());
-            Rect m = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            Rect m = Objects.requireNonNull(characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE));
+            Log.i(TAG, "applyZoom: sensor Array = " + m);
+
             int newWidth = (int) (m.width() / currentZoomLevel);
             int newHeight = (int) (m.height() / currentZoomLevel);
             int leftOffset = (m.width() - newWidth) / 2;
             int topOffset = (m.height() - newHeight) / 2;
-            Rect zoom = new Rect(leftOffset, topOffset, leftOffset + newWidth, topOffset + newHeight);
-            currentZoomRect = zoom;
-            captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoom);
+            currentZoomRect = new Rect(leftOffset, topOffset, leftOffset + newWidth, topOffset + newHeight);
+            Log.i(TAG, "applyZoom: currentZoomLevel = " + currentZoomLevel);
+            Log.i(TAG, "applyZoom: currentZoomRect = " + currentZoomRect);
+            captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, currentZoomRect);
             cameraCaptureSessions.setRepeatingRequest(captureRequestBuilder.build(),
                     new CameraCaptureSession.CaptureCallback() {
                         @Override
@@ -188,17 +191,20 @@ public class CameraActivity extends AppCompatActivity {
     private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
+            Log.i(TAG, "onOpened: ");
             cameraDevice = camera;
             createCameraPreview();
         }
 
         @Override
         public void onDisconnected(@NonNull CameraDevice camera) {
+            Log.i(TAG, "onDisconnected: ");
             cameraDevice.close();
         }
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
+            Log.i(TAG, "onError: ");
             cameraDevice.close();
             cameraDevice = null;
         }
@@ -210,7 +216,7 @@ public class CameraActivity extends AppCompatActivity {
             assert texture != null;
             texture.setDefaultBufferSize(imageDimension.getWidth(), imageDimension.getHeight());
             Surface surface = new Surface(texture);
-            captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureRequestBuilder.addTarget(surface);
             currentZoomRect = cameraManager.getCameraCharacteristics(cameraDevice.getId())
                     .get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
@@ -244,30 +250,25 @@ public class CameraActivity extends AppCompatActivity {
 
     private void takePicture() {
         if (cameraDevice == null) return;
-        CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
-            Size[] jpegSizes = null;
-            if (characteristics != null) {
-                jpegSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG);
-            }
+            String cameraId = cameraManager.getCameraIdList()[0];
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+            Size[] jpegSizes = Objects.requireNonNull(characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)).getOutputSizes(ImageFormat.JPEG);
             int width = 640;
             int height = 480;
             if (jpegSizes != null && jpegSizes.length > 0) {
                 width = jpegSizes[0].getWidth();
                 height = jpegSizes[0].getHeight();
             }
+
+            Log.d(TAG, "takePicture: width = " + width + ", height = " + height);
             final ImageReader reader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1);
             List<Surface> outputSurfaces = Arrays.asList(reader.getSurface(), new Surface(textureView.getSurfaceTexture()));
-            final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            captureBuilder.addTarget(reader.getSurface());
-            captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-            captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, currentZoomRect);
+            captureRequestBuilder.addTarget(reader.getSurface());
             Log.d(TAG, "takePicture: " + currentZoomRect);
 
             // Orientation
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
-            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
 
             final File file = new File(getExternalFilesDir(null), UUID.randomUUID().toString() + ".jpg");
             ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
@@ -275,6 +276,7 @@ public class CameraActivity extends AppCompatActivity {
                 public void onImageAvailable(ImageReader reader) {
                     Image image = null;
                     try {
+                        currentZoomLevel = 1f;
                         image = reader.acquireLatestImage();
                         textRecognizer.recognizeTextFromImage(image, ORIENTATIONS.get(rotation))
                                 .addOnSuccessListener(visionText -> {
@@ -290,8 +292,6 @@ public class CameraActivity extends AppCompatActivity {
                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.capacity()];
                         save(bytes);
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
                     } finally {
@@ -302,14 +302,8 @@ public class CameraActivity extends AppCompatActivity {
                 }
 
                 private void save(byte[] bytes) throws IOException {
-                    OutputStream output = null;
-                    try {
-                        output = new FileOutputStream(file);
+                    try (OutputStream output = Files.newOutputStream(file.toPath())) {
                         output.write(bytes);
-                    } finally {
-                        if (output != null) {
-                            output.close();
-                        }
                     }
                 }
             };
@@ -327,7 +321,7 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     try {
-                        session.capture(captureBuilder.build(), captureListener, null);
+                        session.capture(captureRequestBuilder.build(), captureListener, null);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
