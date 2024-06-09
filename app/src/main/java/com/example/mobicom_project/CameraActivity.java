@@ -100,7 +100,7 @@ public class CameraActivity extends AppCompatActivity {
 
         ImageView canvasView = findViewById(R.id.canvasView);
         capturedView = findViewById(R.id.capturedView);
-        textRecognizer = new MLKitTextRecognition(canvasView, capturedView);
+        textRecognizer = new MLKitTextRecognition(canvasView, capturedView, textView3);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 200);
