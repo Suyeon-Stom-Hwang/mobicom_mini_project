@@ -99,12 +99,12 @@ public class MLKitTextRecognition extends AppCompatActivity {
 
         Paint bgPaint = new Paint();
         bgPaint.setStyle(Paint.Style.FILL);
-        bgPaint.setColor(Color.argb(0.6f, 1.0f, 1.0f, 1.0f));
+        bgPaint.setColor(Color.argb(0.3f, 1.0f, 1.0f, 1.0f));
 
         Paint strokePaint = new Paint();
         strokePaint.setStyle(Paint.Style.STROKE);
         strokePaint.setColor(Color.RED);
-        strokePaint.setStrokeWidth(8);
+        strokePaint.setStrokeWidth(10);
 
         TextPaint textPaint = new TextPaint();
         textPaint.setColor(Color.BLACK);
