@@ -222,8 +222,12 @@ public class CameraActivity extends AppCompatActivity {
             Surface surface = new Surface(texture);
             captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureRequestBuilder.addTarget(surface);
-            currentZoomRect = cameraManager.getCameraCharacteristics(cameraDevice.getId())
-                    .get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            if (currentZoomRect != null) {
+                captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, currentZoomRect);
+            } else {
+                currentZoomRect = cameraManager.getCameraCharacteristics(cameraDevice.getId())
+                        .get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            }
 
             cameraDevice.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
@@ -285,7 +289,7 @@ public class CameraActivity extends AppCompatActivity {
                 public void onImageAvailable(ImageReader reader) {
                     Image image = null;
                     try {
-                        currentZoomLevel = 1f;
+//                        currentZoomLevel = 1f;
                         image = reader.acquireLatestImage();
 //                        capturedView.setImageBitmap(textureView.getBitmap());
                         InputImage inputImage = InputImage.fromBitmap(textureView.getBitmap(), 0);
