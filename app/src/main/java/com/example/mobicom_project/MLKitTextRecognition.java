@@ -5,7 +5,9 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.media.Image;
+import android.text.TextPaint;
 import android.util.Log;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
@@ -66,19 +68,50 @@ public class MLKitTextRecognition extends AppCompatActivity {
                 });
     }
 
+    public Task<Text> recognizeTextFromImage(InputImage image) {
+        capturedView.setImageBitmap(image.getBitmapInternal());
+        return recognizerKor.process(image)
+                .addOnSuccessListener(visionText -> {
+                    Log.i(TAG, "onSuccess: " +  visionText.getText());
+                    runOnUiThread(() -> drawBoundingBox(image.getWidth(), image.getHeight(), visionText));
+                })
+                .addOnFailureListener(e -> {
+                    Log.i(TAG, "onFailure: " +  e);
+                })
+                .addOnCompleteListener(task -> {
+                    Log.i(TAG, "onComplete: " +  task);
+                });
+    }
+
     private void drawBoundingBox(int imageW, int imageH, Text output) {
         Log.i(TAG, "drawBoundingBox: imageW = " + imageW + ", imageH = " + imageH);
 
-        Paint boxPaint = new Paint();
-        boxPaint.setStyle(Paint.Style.STROKE);
-        boxPaint.setColor(Color.RED);
-        boxPaint.setStrokeWidth(8);
+        Paint bgPaint = new Paint();
+        bgPaint.setStyle(Paint.Style.FILL);
+        bgPaint.setColor(Color.argb(0.6f, 1.0f, 1.0f, 1.0f));
+
+        Paint strokePaint = new Paint();
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setColor(Color.RED);
+        strokePaint.setStrokeWidth(8);
+
+        TextPaint textPaint = new TextPaint();
+        textPaint.setColor(Color.BLACK);
+        textPaint.setTextSize(140);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setTypeface(Typeface.defaultFromStyle(Typeface.BOLD));
         for (Text.TextBlock block : output.getTextBlocks()) {
             Rect boundingBox = block.getBoundingBox();
             if (boundingBox != null) {
                 Log.d(TAG, "drawBoundingBox: " + boundingBox);
                 Rect fixedRect = rearrangePosition(imageW, imageH, boundingBox);
-                boundingBoxCanvas.drawRect(fixedRect, boxPaint);
+                boundingBoxCanvas.drawRect(fixedRect, bgPaint);
+                boundingBoxCanvas.drawRect(fixedRect, strokePaint);
+                for (Text.Line line : block.getLines()) {
+                    Rect fixedLineRect = rearrangePosition(imageW, imageH, line.getBoundingBox());
+                    boundingBoxCanvas.drawText(line.getText(), fixedLineRect.centerX(), fixedLineRect.centerY() + 70, textPaint);
+
+                }
             }
         }
         canvasView.invalidate();
@@ -88,12 +121,12 @@ public class MLKitTextRecognition extends AppCompatActivity {
         Log.i(TAG, "rearrangePosition: canvas = " + canvasView);
         float ratioW = (float) canvasView.getWidth() / imageW;
         float ratioH = (float) canvasView.getHeight() / imageH;
-
+        final int padding = 20;
         return new Rect(
-                (int) (boundingBox.left * ratioW),
-                (int) (boundingBox.top * ratioH),
-                (int) (boundingBox.right * ratioW),
-                (int) (boundingBox.bottom * ratioH));
+                (int) (boundingBox.left * ratioW) - padding,
+                (int) (boundingBox.top * ratioH) - padding,
+                (int) (boundingBox.right * ratioW) + padding,
+                (int) (boundingBox.bottom * ratioH) + padding);
     }
 
     public void clearBoundingBox() {

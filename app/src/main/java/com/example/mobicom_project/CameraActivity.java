@@ -27,6 +27,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.mlkit.vision.common.InputImage;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -51,6 +53,7 @@ public class CameraActivity extends AppCompatActivity {
     private Size imageDimension;
     private ScaleGestureDetector scaleGestureDetector;
     private MLKitTextRecognition textRecognizer;
+    private ImageView capturedView;
     private float currentZoomLevel = 1f;
     private float maximumZoomLevel;
     private boolean isZooming = false;
@@ -96,8 +99,8 @@ public class CameraActivity extends AppCompatActivity {
         });
 
         ImageView canvasView = findViewById(R.id.canvasView);
-        ImageView tempView = findViewById(R.id.capturedView);
-        textRecognizer = new MLKitTextRecognition(canvasView, tempView);
+        capturedView = findViewById(R.id.capturedView);
+        textRecognizer = new MLKitTextRecognition(canvasView, capturedView);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 200);
@@ -136,6 +139,7 @@ public class CameraActivity extends AppCompatActivity {
     private void openCamera() {
         cameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
+            Log.i(TAG, "openCamera: " + Arrays.toString(cameraManager.getCameraIdList()));
             String cameraId = cameraManager.getCameraIdList()[0];
             CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
@@ -263,9 +267,14 @@ public class CameraActivity extends AppCompatActivity {
 
             Log.d(TAG, "takePicture: width = " + width + ", height = " + height);
             final ImageReader reader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1);
-            List<Surface> outputSurfaces = Arrays.asList(reader.getSurface(), new Surface(textureView.getSurfaceTexture()));
-            captureRequestBuilder.addTarget(reader.getSurface());
+            List<Surface> outputSurfaces = Arrays.asList(reader.getSurface());
+            final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureBuilder.addTarget(reader.getSurface());
+            captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+            captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, currentZoomRect);
+//            captureRequestBuilder.addTarget(reader.getSurface());
             Log.d(TAG, "takePicture: " + currentZoomRect);
+
 
             // Orientation
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -278,7 +287,9 @@ public class CameraActivity extends AppCompatActivity {
                     try {
                         currentZoomLevel = 1f;
                         image = reader.acquireLatestImage();
-                        textRecognizer.recognizeTextFromImage(image, ORIENTATIONS.get(rotation))
+//                        capturedView.setImageBitmap(textureView.getBitmap());
+                        InputImage inputImage = InputImage.fromBitmap(textureView.getBitmap(), 0);
+                        textRecognizer.recognizeTextFromImage(inputImage)
                                 .addOnSuccessListener(visionText -> {
                                     Log.i(TAG, "onSuccess: " +  visionText.getText());
                                     runOnUiThread(() -> textView3.setText(visionText.getText()));
@@ -321,7 +332,7 @@ public class CameraActivity extends AppCompatActivity {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     try {
-                        session.capture(captureRequestBuilder.build(), captureListener, null);
+                        session.capture(captureBuilder.build(), captureListener, null);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
